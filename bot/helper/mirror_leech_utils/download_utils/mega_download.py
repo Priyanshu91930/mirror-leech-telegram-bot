@@ -172,7 +172,38 @@ class MegaDownloadHelper:
                         self.listener.name = nodes[root_id].get("attributes", {}).get("n", "MegaFolder")
                     
                     LOGGER.info(f"Downloading Mega Folder: {self.listener.name} ({self.listener.size} bytes)")
-                    await self.client.download_folder_url(url, dest_path=temp_dir)
+                    sem = asyncio.Semaphore(4) # Limit concurrent downloads to 4 to prevent 429
+                    
+                    async def download_file_sem(file_node, file_rel_path):
+                        async with sem:
+                            file_data = await self.client.api.request(
+                                {
+                                    "a": "g",
+                                    "g": 1,
+                                    "n": file_node["h"],
+                                },
+                                {"n": folder_id},
+                            )
+                            file_url = file_data["g"]
+                            file_size = file_data["s"]
+                            download_path = Path(temp_dir) / file_rel_path
+                            await self.client._really_download_file(
+                                file_url,
+                                download_path,
+                                file_size,
+                                file_node["iv"],
+                                file_node["meta_mac"],
+                                file_node["k_decrypted"],
+                            )
+
+                    download_tasks = []
+                    for rel_path, node in fs.items():
+                        if node["t"] != 0: # 0 represents NodeType.FILE
+                            continue
+                        download_tasks.append(download_file_sem(node, Path(rel_path)))
+
+                    with self.client._progress_bar:
+                        await asyncio.gather(*download_tasks)
                 else:
                     info = await self.client.get_public_url_info(url)
                     self.listener.size = info["size"]
@@ -191,17 +222,18 @@ class MegaDownloadHelper:
                 if self.client and self.client.api and self.client.api.session:
                     await self.client.api.session.close()
 
-                if self._proxies and attempt < len(self._proxies) - 1:
-                    self._current_proxy_index += 1
-                    LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
-                    self._processed_bytes = 0
-                    for filename in os.listdir(temp_dir):
-                        filepath = os.path.join(temp_dir, filename)
-                        if os.path.isfile(filepath) or os.path.islink(filepath):
-                            os.unlink(filepath)
-                        elif os.path.isdir(filepath):
-                            shutil.rmtree(filepath)
-                    continue
+                if "Bandwidth limit" in error_msg or "temporary" in error_msg.lower() or "509" in error_msg or "Request failed" in error_msg:
+                    if self._proxies and attempt < len(self._proxies) - 1:
+                        self._current_proxy_index += 1
+                        LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
+                        self._processed_bytes = 0
+                        for filename in os.listdir(temp_dir):
+                            filepath = os.path.join(temp_dir, filename)
+                            if os.path.isfile(filepath) or os.path.islink(filepath):
+                                os.unlink(filepath)
+                            elif os.path.isdir(filepath):
+                                shutil.rmtree(filepath)
+                        continue
                 break
 
         try:
