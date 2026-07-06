@@ -107,12 +107,9 @@ class MegaDownloadHelper:
         if proxy:
             self.client.api.session = ProxyClientSession(proxy=proxy, timeout=self.client.api.timeout)
         
-        email = Config.MEGA_EMAIL
-        password = Config.MEGA_PASSWORD
-        if email and password:
-            await self.client.login(email, password)
-        else:
-            await self.client.login_anonymous()
+        email = Config.MEGA_EMAIL or None
+        password = Config.MEGA_PASSWORD or None
+        await self.client.login(email, password)
 
     async def cancel_task(self):
         self.listener.is_cancelled = True
@@ -177,7 +174,7 @@ class MegaDownloadHelper:
                     LOGGER.info(f"Downloading Mega Folder: {self.listener.name} ({self.listener.size} bytes)")
                     await self.client.download_folder_url(url, dest_path=temp_dir)
                 else:
-                    info = await self.client.get_public_file_info(url)
+                    info = await self.client.get_public_url_info(url)
                     self.listener.size = info["size"]
                     if not self.listener.name:
                         self.listener.name = info["name"]
