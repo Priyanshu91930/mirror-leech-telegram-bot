@@ -15,7 +15,7 @@ except ImportError as e:
         client_dir = dir(mega.client)
     except Exception as ce:
         client_dir = str(ce)
-    LOGGER.error(f"DEBUG MEGA IMPORT: dir(mega)={dir(mega)}, dir(mega.client)={client_dir}")
+    print(f"DEBUG MEGA IMPORT: dir(mega)={dir(mega)}, dir(mega.client)={client_dir}", flush=True)
     raise e
 from mega.errors import RequestError
 
