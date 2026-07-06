@@ -14,6 +14,7 @@ from .... import (
     LOGGER,
     task_dict,
     task_dict_lock,
+    DOWNLOAD_DIR,
 )
 from ....core.config_manager import Config
 from ...ext_utils.task_manager import check_running_tasks, stop_duplicate_check
@@ -180,6 +181,18 @@ class MegaDownloadHelper:
                         
                         folder_name = self.listener.name
                         total_files = sum(1 for n in fs.values() if n.get("t") == 0)
+                        
+                        resume_dir = os.path.join(DOWNLOAD_DIR, "mega_resume_state")
+                        os.makedirs(resume_dir, exist_ok=True)
+                        state_file = os.path.join(resume_dir, f"{folder_id}.txt")
+                        
+                        if os.path.exists(state_file) and not processed_files:
+                            with open(state_file, "r", encoding="utf-8") as f:
+                                for line in f:
+                                    if line.strip():
+                                        processed_files.add(line.strip())
+                            LOGGER.info(f"Loaded {len(processed_files)} completed files from resume state.")
+                        
                         count = 0
                         for rel_path, node in fs.items():
                             if node["t"] != 0: # 0 represents NodeType.FILE
@@ -229,15 +242,24 @@ class MegaDownloadHelper:
                                 # 3. Delete from disk immediately to save space
                                 shutil.rmtree(sub_temp_dir, ignore_errors=True)
                                 processed_files.add(rel_path)
+                                with open(state_file, "a", encoding="utf-8") as f:
+                                    f.write(rel_path + "\n")
                             except Exception as fe:
                                 if "blocked" in str(fe).lower() or "eblocked" in str(fe).lower():
                                     LOGGER.warning(f"File blocked by Mega (DMCA/Suspended), skipping: {rel_path}")
                                     shutil.rmtree(sub_temp_dir, ignore_errors=True)
                                     processed_files.add(rel_path)
+                                    with open(state_file, "a", encoding="utf-8") as f:
+                                        f.write(rel_path + "\n")
                                     continue
                                 raise fe
                         
                         self.listener.name = folder_name
+                        if os.path.exists(state_file):
+                            try:
+                                os.remove(state_file)
+                            except:
+                                pass
                         
                         # Create dummy file to allow listener.on_download_complete() to finish without errors
                         dummy_file = os.path.join(temp_dir, "Leech_Completed.txt")
