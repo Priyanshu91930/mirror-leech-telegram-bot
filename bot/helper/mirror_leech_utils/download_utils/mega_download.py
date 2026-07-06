@@ -6,7 +6,7 @@ from time import time
 from pathlib import Path
 from secrets import token_urlsafe
 
-from mega.client import MegaNzClient
+from mega.client import Mega
 from mega.errors import RequestError
 
 from .... import (
@@ -101,7 +101,7 @@ class MegaDownloadHelper:
         if proxy:
             LOGGER.info(f"Using proxy for Mega download: {proxy}")
         
-        self.client = MegaNzClient()
+        self.client = Mega(use_progress_bar=False)
         self.client._progress_bar = CustomProgressBar(self)
         
         if proxy:
