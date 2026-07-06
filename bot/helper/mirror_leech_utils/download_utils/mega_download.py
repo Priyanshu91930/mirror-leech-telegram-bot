@@ -294,7 +294,7 @@ class MegaDownloadHelper:
                 if self.client and self.client.api and self.client.api.session:
                     await self.client.api.session.close()
 
-                if "bandwidth limit" in error_msg.lower() or "temporary" in error_msg.lower() or "509" in error_msg or "request failed" in error_msg.lower() or "blocked" in error_msg.lower():
+                if "bandwidth limit" in error_msg.lower() or "temporary" in error_msg.lower() or "509" in error_msg or "request failed" in error_msg.lower() or "blocked" in error_msg.lower() or "payment required" in error_msg.lower() or "402" in error_msg:
                     if self._proxies and attempt < len(self._proxies) - 1:
                         self._current_proxy_index += 1
                         LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
