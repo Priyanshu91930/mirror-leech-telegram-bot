@@ -172,38 +172,92 @@ class MegaDownloadHelper:
                         self.listener.name = nodes[root_id].get("attributes", {}).get("n", "MegaFolder")
                     
                     LOGGER.info(f"Downloading Mega Folder: {self.listener.name} ({self.listener.size} bytes)")
-                    sem = asyncio.Semaphore(4) # Limit concurrent downloads to 4 to prevent 429
                     
-                    async def download_file_sem(file_node, file_rel_path):
-                        async with sem:
+                    if self.listener.is_leech:
+                        from ...mirror_leech_utils.telegram_uploader import TelegramUploader
+                        
+                        count = 0
+                        for rel_path, node in fs.items():
+                            if node["t"] != 0: # 0 represents NodeType.FILE
+                                continue
+                            if self.listener.is_cancelled:
+                                break
+                            
+                            count += 1
+                            LOGGER.info(f"Processing folder file {count}: {rel_path}")
+                            
+                            # 1. Download single file
                             file_data = await self.client.api.request(
                                 {
                                     "a": "g",
                                     "g": 1,
-                                    "n": file_node["h"],
+                                    "n": node["h"],
                                 },
                                 {"n": folder_id},
                             )
                             file_url = file_data["g"]
                             file_size = file_data["s"]
-                            download_path = Path(temp_dir) / file_rel_path
+                            
+                            # Create a unique temp folder for this file
+                            sub_temp_dir = os.path.join(temp_dir, f"part_{count}")
+                            os.makedirs(sub_temp_dir, exist_ok=True)
+                            download_path = Path(sub_temp_dir) / rel_path
+                            os.makedirs(download_path.parent, exist_ok=True)
+                            
                             await self.client._really_download_file(
                                 file_url,
                                 download_path,
                                 file_size,
-                                file_node["iv"],
-                                file_node["meta_mac"],
-                                file_node["k_decrypted"],
+                                node["iv"],
+                                node["meta_mac"],
+                                node["k_decrypted"],
                             )
+                            
+                            # 2. Upload to Telegram immediately
+                            if not self.listener.is_cancelled:
+                                uploader = TelegramUploader(self.listener, sub_temp_dir)
+                                await uploader.upload()
+                            
+                            # 3. Delete from disk immediately to save space
+                            shutil.rmtree(sub_temp_dir, ignore_errors=True)
+                        
+                        # Create dummy file to allow listener.on_download_complete() to finish without errors
+                        dummy_file = os.path.join(temp_dir, "Leech_Completed.txt")
+                        with open(dummy_file, "w") as f:
+                            f.write("Mega Folder Leech Completed Successfully!")
+                    else:
+                        sem = asyncio.Semaphore(4) # Limit concurrent downloads to 4 for non-leech tasks (mirror)
+                        
+                        async def download_file_sem(file_node, file_rel_path):
+                            async with sem:
+                                file_data = await self.client.api.request(
+                                    {
+                                        "a": "g",
+                                        "g": 1,
+                                        "n": file_node["h"],
+                                    },
+                                    {"n": folder_id},
+                                )
+                                file_url = file_data["g"]
+                                file_size = file_data["s"]
+                                download_path = Path(temp_dir) / file_rel_path
+                                await self.client._really_download_file(
+                                    file_url,
+                                    download_path,
+                                    file_size,
+                                    file_node["iv"],
+                                    file_node["meta_mac"],
+                                    file_node["k_decrypted"],
+                                )
 
-                    download_tasks = []
-                    for rel_path, node in fs.items():
-                        if node["t"] != 0: # 0 represents NodeType.FILE
-                            continue
-                        download_tasks.append(download_file_sem(node, Path(rel_path)))
+                        download_tasks = []
+                        for rel_path, node in fs.items():
+                            if node["t"] != 0: # 0 represents NodeType.FILE
+                                continue
+                            download_tasks.append(download_file_sem(node, Path(rel_path)))
 
-                    with self.client._progress_bar:
-                        await asyncio.gather(*download_tasks)
+                        with self.client._progress_bar:
+                            await asyncio.gather(*download_tasks)
                 else:
                     info = await self.client.get_public_url_info(url)
                     self.listener.size = info["size"]
