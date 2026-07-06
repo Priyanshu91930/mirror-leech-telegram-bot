@@ -176,6 +176,8 @@ class MegaDownloadHelper:
                     if self.listener.is_leech:
                         from ...mirror_leech_utils.telegram_uploader import TelegramUploader
                         
+                        folder_name = self.listener.name
+                        total_files = sum(1 for n in fs.values() if n.get("t") == 0)
                         count = 0
                         for rel_path, node in fs.items():
                             if node["t"] != 0: # 0 represents NodeType.FILE
@@ -184,7 +186,9 @@ class MegaDownloadHelper:
                                 break
                             
                             count += 1
-                            LOGGER.info(f"Processing folder file {count}: {rel_path}")
+                            file_basename = os.path.basename(rel_path)
+                            self.listener.name = f"{folder_name} | [{count}/{total_files}] {file_basename}"
+                            LOGGER.info(f"Processing folder file {count}/{total_files}: {rel_path}")
                             
                             # 1. Download single file
                             file_data = await self.client.api.request(
@@ -220,6 +224,8 @@ class MegaDownloadHelper:
                             
                             # 3. Delete from disk immediately to save space
                             shutil.rmtree(sub_temp_dir, ignore_errors=True)
+                        
+                        self.listener.name = folder_name
                         
                         # Create dummy file to allow listener.on_download_complete() to finish without errors
                         dummy_file = os.path.join(temp_dir, "Leech_Completed.txt")
