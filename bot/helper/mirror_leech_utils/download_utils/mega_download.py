@@ -8,6 +8,7 @@ from secrets import token_urlsafe
 
 from mega.client import Mega
 from mega.errors import RequestError
+from natsort import natsorted
 
 from .... import (
     LOGGER,
@@ -166,6 +167,7 @@ class MegaDownloadHelper:
                     nodes = await self.client.get_nodes_public_folder(url)
                     root_id = next(iter(nodes))
                     fs = await self.client._build_file_system(nodes, [root_id])
+                    fs = dict(natsorted(fs.items(), key=lambda x: x[0]))
                     self.listener.size = sum(node.get("s", 0) for node in fs.values() if node.get("t") == 0)
                     
                     if not self.listener.name:
