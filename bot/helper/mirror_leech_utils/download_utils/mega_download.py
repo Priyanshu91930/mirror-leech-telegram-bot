@@ -191,18 +191,17 @@ class MegaDownloadHelper:
                 if self.client and self.client.api and self.client.api.session:
                     await self.client.api.session.close()
 
-                if "Bandwidth limit" in error_msg or "temporary" in error_msg.lower() or "509" in error_msg or "Request failed" in error_msg:
-                    if self._proxies and attempt < len(self._proxies) - 1:
-                        self._current_proxy_index += 1
-                        LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
-                        self._processed_bytes = 0
-                        for filename in os.listdir(temp_dir):
-                            filepath = os.path.join(temp_dir, filename)
-                            if os.path.isfile(filepath) or os.path.islink(filepath):
-                                os.unlink(filepath)
-                            elif os.path.isdir(filepath):
-                                shutil.rmtree(filepath)
-                        continue
+                if self._proxies and attempt < len(self._proxies) - 1:
+                    self._current_proxy_index += 1
+                    LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
+                    self._processed_bytes = 0
+                    for filename in os.listdir(temp_dir):
+                        filepath = os.path.join(temp_dir, filename)
+                        if os.path.isfile(filepath) or os.path.islink(filepath):
+                            os.unlink(filepath)
+                        elif os.path.isdir(filepath):
+                            shutil.rmtree(filepath)
+                    continue
                 break
 
         try:
