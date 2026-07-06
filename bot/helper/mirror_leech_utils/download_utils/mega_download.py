@@ -6,7 +6,17 @@ from time import time
 from pathlib import Path
 from secrets import token_urlsafe
 
-from mega.client import Mega
+try:
+    from mega.client import Mega
+except ImportError as e:
+    import mega
+    try:
+        import mega.client
+        client_dir = dir(mega.client)
+    except Exception as ce:
+        client_dir = str(ce)
+    LOGGER.error(f"DEBUG MEGA IMPORT: dir(mega)={dir(mega)}, dir(mega.client)={client_dir}")
+    raise e
 from mega.errors import RequestError
 
 from .... import (
