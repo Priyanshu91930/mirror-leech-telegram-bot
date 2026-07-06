@@ -179,6 +179,7 @@ class MegaDownloadHelper:
                     
                     if self.listener.is_leech:
                         from ...mirror_leech_utils.telegram_uploader import TelegramUploader
+                        from ...ext_utils.db_handler import database
                         
                         folder_name = self.listener.name
                         total_files = sum(1 for n in fs.values() if n.get("t") == 0)
@@ -189,12 +190,18 @@ class MegaDownloadHelper:
                         os.makedirs(resume_dir, exist_ok=True)
                         state_file = os.path.join(resume_dir, f"{folder_id}.txt")
                         
-                        if os.path.exists(state_file) and not processed_files:
+                        if not database._return:
+                            db_state = await database.db.mega_resume.find_one({"_id": folder_id})
+                            if db_state and not processed_files:
+                                processed_files = set(db_state.get("processed_files", []))
+                                LOGGER.info(f"Loaded {len(processed_files)} completed files from MongoDB resume state.")
+                        
+                        if not processed_files and os.path.exists(state_file):
                             with open(state_file, "r", encoding="utf-8") as f:
                                 for line in f:
                                     if line.strip():
                                         processed_files.add(line.strip())
-                            LOGGER.info(f"Loaded {len(processed_files)} completed files from resume state.")
+                            LOGGER.info(f"Loaded {len(processed_files)} completed files from local resume state.")
                         
                         count = 0
                         for rel_path, node in fs.items():
@@ -249,6 +256,12 @@ class MegaDownloadHelper:
                                 # 3. Delete from disk immediately to save space
                                 shutil.rmtree(sub_temp_dir, ignore_errors=True)
                                 processed_files.add(rel_path)
+                                if not database._return:
+                                    await database.db.mega_resume.update_one(
+                                        {"_id": folder_id},
+                                        {"$addToSet": {"processed_files": rel_path}},
+                                        upsert=True
+                                    )
                                 with open(state_file, "a", encoding="utf-8") as f:
                                     f.write(rel_path + "\n")
                             except Exception as fe:
@@ -256,12 +269,20 @@ class MegaDownloadHelper:
                                     LOGGER.warning(f"File blocked by Mega (DMCA/Suspended), skipping: {rel_path}")
                                     shutil.rmtree(sub_temp_dir, ignore_errors=True)
                                     processed_files.add(rel_path)
+                                    if not database._return:
+                                        await database.db.mega_resume.update_one(
+                                            {"_id": folder_id},
+                                            {"$addToSet": {"processed_files": rel_path}},
+                                            upsert=True
+                                        )
                                     with open(state_file, "a", encoding="utf-8") as f:
                                         f.write(rel_path + "\n")
                                     continue
                                 raise fe
                         
                         self.listener.name = folder_name
+                        if not database._return:
+                            await database.db.mega_resume.delete_one({"_id": folder_id})
                         if os.path.exists(state_file):
                             try:
                                 os.remove(state_file)
