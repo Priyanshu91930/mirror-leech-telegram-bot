@@ -292,12 +292,13 @@ class MegaDownloadHelper:
                         self._current_proxy_index += 1
                         LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
                         self._processed_bytes = 0
-                        for filename in os.listdir(temp_dir):
-                            filepath = os.path.join(temp_dir, filename)
-                            if os.path.isfile(filepath) or os.path.islink(filepath):
-                                os.unlink(filepath)
-                            elif os.path.isdir(filepath):
-                                shutil.rmtree(filepath)
+                        if os.path.exists(temp_dir):
+                            for filename in os.listdir(temp_dir):
+                                filepath = os.path.join(temp_dir, filename)
+                                if os.path.isfile(filepath) or os.path.islink(filepath):
+                                    os.unlink(filepath)
+                                elif os.path.isdir(filepath):
+                                    shutil.rmtree(filepath)
                         continue
                 break
 
