@@ -39,8 +39,8 @@ RCLONE_SERVE_PASS = ""
 JD_EMAIL = ""
 JD_PASS = ""
 # Mega
-MEGA_EMAIL = ""
-MEGA_PASSWORD = ""
+MEGA_EMAIL = "priyanshusolanki62@gmail.com"
+MEGA_PASSWORD = "zxcvbnmm9193"
 MEGA_PROXIES = []
 # Sabnzbd
 USENET_SERVERS = [
