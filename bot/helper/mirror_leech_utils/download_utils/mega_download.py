@@ -110,9 +110,20 @@ class MegaDownloadHelper:
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
             self.client.api.session = ProxyClientSession(proxy=proxy, timeout=timeout)
         
-        email = Config.MEGA_EMAIL or None
-        password = Config.MEGA_PASSWORD or None
-        await self.client.login(email, password)
+        accounts = Config.MEGA_ACCOUNTS
+        if not accounts and Config.MEGA_EMAIL:
+            accounts = [(Config.MEGA_EMAIL, Config.MEGA_PASSWORD)]
+            
+        if accounts:
+            if not hasattr(self, "_current_account_index"):
+                self._current_account_index = 0
+            self._current_account_index %= len(accounts)
+            email, password = accounts[self._current_account_index]
+            LOGGER.info(f"Logging in to Mega account: {email}")
+            await self.client.login(email, password)
+        else:
+            LOGGER.info("Logging in anonymous temporary user...")
+            await self.client.login(email=None, password=None)
 
     async def cancel_task(self):
         self.listener.is_cancelled = True
@@ -154,7 +165,9 @@ class MegaDownloadHelper:
         url = self.listener.link
         is_folder = "folder/" in url or "#F!" in url
 
-        retries = len(self._proxies) if self._proxies else 1
+        num_accounts = len(Config.MEGA_ACCOUNTS) if Config.MEGA_ACCOUNTS else 1
+        num_proxies = len(self._proxies) if self._proxies else 1
+        retries = max(num_accounts, num_proxies, 10)
         success = False
         error_msg = ""
         processed_files = set()
@@ -345,7 +358,19 @@ class MegaDownloadHelper:
                 if self.client and self.client.api and self.client.api.session:
                     await self.client.api.session.close()
 
-                if not error_msg or isinstance(e, (asyncio.TimeoutError, TimeoutError)) or "bandwidth limit" in error_msg.lower() or "temporary" in error_msg.lower() or "509" in error_msg or "request failed" in error_msg.lower() or "blocked" in error_msg.lower() or "payment required" in error_msg.lower() or "402" in error_msg or "timeout" in error_msg.lower() or "connect" in error_msg.lower():
+                # Rotate Mega account on bandwidth limit/quota errors
+                if "bandwidth" in error_msg.lower() or "509" in error_msg or "overquota" in error_msg.lower() or "over quota" in error_msg.lower() or "temporary" in error_msg.lower():
+                    accounts = Config.MEGA_ACCOUNTS
+                    if accounts and len(accounts) > 1:
+                        if not hasattr(self, "_current_account_index"):
+                            self._current_account_index = 0
+                        self._current_account_index += 1
+                        LOGGER.info(f"Rotating to next Mega account: {accounts[self._current_account_index % len(accounts)][0]}")
+                        self._processed_bytes = 0
+                        continue
+
+                # Rotate proxy on proxy/timeout errors
+                if not error_msg or isinstance(e, (asyncio.TimeoutError, TimeoutError)) or "payment" in error_msg.lower() or "402" in error_msg or "timeout" in error_msg.lower() or "connect" in error_msg.lower():
                     if self._proxies and attempt < len(self._proxies) - 1:
                         self._current_proxy_index += 1
                         LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")

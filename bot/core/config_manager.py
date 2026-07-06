@@ -28,6 +28,7 @@ class Config:
     MEGA_EMAIL = ""
     MEGA_PASSWORD = ""
     MEGA_PROXIES = []
+    MEGA_ACCOUNTS = []
     LEECH_DUMP_CHAT = ""
     LEECH_FILENAME_PREFIX = ""
     LEECH_SPLIT_SIZE = 2097152000
