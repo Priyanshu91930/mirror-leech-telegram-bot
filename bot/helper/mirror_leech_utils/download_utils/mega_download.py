@@ -195,40 +195,47 @@ class MegaDownloadHelper:
                             LOGGER.info(f"Processing folder file {count}/{total_files}: {rel_path}")
                             
                             # 1. Download single file
-                            file_data = await self.client.api.request(
-                                {
-                                    "a": "g",
-                                    "g": 1,
-                                    "n": node["h"],
-                                },
-                                {"n": folder_id},
-                            )
-                            file_url = file_data["g"]
-                            file_size = file_data["s"]
-                            
-                            # Create a unique temp folder for this file
                             sub_temp_dir = os.path.join(temp_dir, f"part_{count}")
-                            os.makedirs(sub_temp_dir, exist_ok=True)
-                            download_path = Path(sub_temp_dir) / rel_path
-                            os.makedirs(download_path.parent, exist_ok=True)
-                            
-                            await self.client._really_download_file(
-                                file_url,
-                                download_path,
-                                file_size,
-                                node["iv"],
-                                node["meta_mac"],
-                                node["k_decrypted"],
-                            )
-                            
-                            # 2. Upload to Telegram immediately
-                            if not self.listener.is_cancelled:
-                                uploader = TelegramUploader(self.listener, sub_temp_dir)
-                                await uploader.upload()
-                            
-                            # 3. Delete from disk immediately to save space
-                            shutil.rmtree(sub_temp_dir, ignore_errors=True)
-                            processed_files.add(rel_path)
+                            try:
+                                file_data = await self.client.api.request(
+                                    {
+                                        "a": "g",
+                                        "g": 1,
+                                        "n": node["h"],
+                                    },
+                                    {"n": folder_id},
+                                )
+                                file_url = file_data["g"]
+                                file_size = file_data["s"]
+                                
+                                os.makedirs(sub_temp_dir, exist_ok=True)
+                                download_path = Path(sub_temp_dir) / rel_path
+                                os.makedirs(download_path.parent, exist_ok=True)
+                                
+                                await self.client._really_download_file(
+                                    file_url,
+                                    download_path,
+                                    file_size,
+                                    node["iv"],
+                                    node["meta_mac"],
+                                    node["k_decrypted"],
+                                )
+                                
+                                # 2. Upload to Telegram immediately
+                                if not self.listener.is_cancelled:
+                                    uploader = TelegramUploader(self.listener, sub_temp_dir)
+                                    await uploader.upload()
+                                
+                                # 3. Delete from disk immediately to save space
+                                shutil.rmtree(sub_temp_dir, ignore_errors=True)
+                                processed_files.add(rel_path)
+                            except Exception as fe:
+                                if "blocked" in str(fe).lower() or "eblocked" in str(fe).lower():
+                                    LOGGER.warning(f"File blocked by Mega (DMCA/Suspended), skipping: {rel_path}")
+                                    shutil.rmtree(sub_temp_dir, ignore_errors=True)
+                                    processed_files.add(rel_path)
+                                    continue
+                                raise fe
                         
                         self.listener.name = folder_name
                         
