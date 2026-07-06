@@ -107,7 +107,8 @@ class MegaDownloadHelper:
         self.client._progress_bar = CustomProgressBar(self)
         
         if proxy:
-            self.client.api.session = ProxyClientSession(proxy=proxy, timeout=self.client.api.timeout)
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            self.client.api.session = ProxyClientSession(proxy=proxy, timeout=timeout)
         
         email = Config.MEGA_EMAIL or None
         password = Config.MEGA_PASSWORD or None
