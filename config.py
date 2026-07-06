@@ -41,7 +41,18 @@ JD_PASS = ""
 # Mega
 MEGA_EMAIL = "priyanshusolanki62@gmail.com"
 MEGA_PASSWORD = "zxcvbnmm9193"
-MEGA_PROXIES = []
+MEGA_PROXIES = [
+    "31.59.20.176:6754:yyyjunpl:8pm364hileui",
+    "31.56.127.193:7684:yyyjunpl:8pm364hileui",
+    "45.38.107.97:6014:yyyjunpl:8pm364hileui",
+    "198.105.121.200:6462:yyyjunpl:8pm364hileui",
+    "64.137.96.74:6641:yyyjunpl:8pm364hileui",
+    "198.23.243.226:6361:yyyjunpl:8pm364hileui",
+    "2.57.21.2:7239:yyyjunpl:8pm364hileui",
+    "38.154.185.97:6370:yyyjunpl:8pm364hileui",
+    "142.111.67.146:5611:yyyjunpl:8pm364hileui",
+    "191.96.254.138:6185:yyyjunpl:8pm364hileui",
+]
 # Sabnzbd
 USENET_SERVERS = [
     {
