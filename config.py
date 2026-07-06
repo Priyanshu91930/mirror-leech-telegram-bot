@@ -41,7 +41,7 @@ JD_PASS = ""
 # Mega
 MEGA_EMAIL = ""
 MEGA_PASSWORD = ""
-MEGA_PROXIES = ["216.26.236.239:3129:7ppwulnukjfj:g2e0esrqoan4oxh"] * 50
+MEGA_PROXIES = []
 # Sabnzbd
 USENET_SERVERS = [
     {
