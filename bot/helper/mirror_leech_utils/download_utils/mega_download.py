@@ -155,7 +155,7 @@ class MegaDownloadHelper:
         retries = len(self._proxies) if self._proxies else 1
         success = False
         error_msg = ""
-
+        processed_files = set()
         for attempt in range(retries):
             if self.listener.is_cancelled:
                 break
@@ -188,6 +188,8 @@ class MegaDownloadHelper:
                                 break
                             
                             count += 1
+                            if rel_path in processed_files:
+                                continue
                             file_basename = os.path.basename(rel_path)
                             self.listener.name = f"{folder_name} | [{count}/{total_files}] {file_basename}"
                             LOGGER.info(f"Processing folder file {count}/{total_files}: {rel_path}")
@@ -226,6 +228,7 @@ class MegaDownloadHelper:
                             
                             # 3. Delete from disk immediately to save space
                             shutil.rmtree(sub_temp_dir, ignore_errors=True)
+                            processed_files.add(rel_path)
                         
                         self.listener.name = folder_name
                         
@@ -284,7 +287,7 @@ class MegaDownloadHelper:
                 if self.client and self.client.api and self.client.api.session:
                     await self.client.api.session.close()
 
-                if "Bandwidth limit" in error_msg or "temporary" in error_msg.lower() or "509" in error_msg or "Request failed" in error_msg:
+                if "bandwidth limit" in error_msg.lower() or "temporary" in error_msg.lower() or "509" in error_msg or "request failed" in error_msg.lower() or "blocked" in error_msg.lower():
                     if self._proxies and attempt < len(self._proxies) - 1:
                         self._current_proxy_index += 1
                         LOGGER.info(f"Rotating to next proxy: {self._proxies[self._current_proxy_index]}")
