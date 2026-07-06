@@ -6,17 +6,7 @@ from time import time
 from pathlib import Path
 from secrets import token_urlsafe
 
-try:
-    from mega.client import Mega
-except ImportError as e:
-    import mega
-    try:
-        import mega.client
-        client_dir = dir(mega.client)
-    except Exception as ce:
-        client_dir = str(ce)
-    print(f"DEBUG MEGA IMPORT: dir(mega)={dir(mega)}, dir(mega.client)={client_dir}", flush=True)
-    raise e
+from mega.client import MegaNzClient
 from mega.errors import RequestError
 
 from .... import (
@@ -111,7 +101,7 @@ class MegaDownloadHelper:
         if proxy:
             LOGGER.info(f"Using proxy for Mega download: {proxy}")
         
-        self.client = Mega(use_progress_bar=False)
+        self.client = MegaNzClient(use_progress_bar=False)
         self.client._progress_bar = CustomProgressBar(self)
         
         if proxy:
