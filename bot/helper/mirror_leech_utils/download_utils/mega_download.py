@@ -182,6 +182,8 @@ class MegaDownloadHelper:
                         
                         folder_name = self.listener.name
                         total_files = sum(1 for n in fs.values() if n.get("t") == 0)
+                        all_uploaded_files = {}
+                        total_corrupted = 0
                         
                         resume_dir = os.path.join(DOWNLOAD_DIR, "mega_resume_state")
                         os.makedirs(resume_dir, exist_ok=True)
@@ -196,6 +198,7 @@ class MegaDownloadHelper:
                         
                         count = 0
                         for rel_path, node in fs.items():
+                            rel_path = str(rel_path)
                             if node["t"] != 0: # 0 represents NodeType.FILE
                                 continue
                             if self.listener.is_cancelled:
@@ -237,8 +240,11 @@ class MegaDownloadHelper:
                                 
                                 # 2. Upload to Telegram immediately
                                 if not self.listener.is_cancelled:
-                                    uploader = TelegramUploader(self.listener, sub_temp_dir)
-                                    await uploader.upload()
+                                    uploader = TelegramUploader(self.listener, sub_temp_dir, is_sub_upload=True)
+                                    msgs = await uploader.upload()
+                                    if msgs:
+                                        all_uploaded_files.update(msgs)
+                                    total_corrupted += uploader._corrupted
                                 
                                 # 3. Delete from disk immediately to save space
                                 shutil.rmtree(sub_temp_dir, ignore_errors=True)
@@ -262,10 +268,11 @@ class MegaDownloadHelper:
                             except:
                                 pass
                         
-                        # Create dummy file to allow listener.on_download_complete() to finish without errors
-                        dummy_file = os.path.join(temp_dir, "Leech_Completed.txt")
-                        with open(dummy_file, "w") as f:
-                            f.write("Mega Folder Leech Completed Successfully!")
+                        if not self.listener.is_cancelled:
+                            await self.listener.on_upload_complete(
+                                None, all_uploaded_files, total_files, total_corrupted
+                            )
+                        return
                     else:
                         sem = asyncio.Semaphore(4) # Limit concurrent downloads to 4 for non-leech tasks (mirror)
                         
