@@ -101,7 +101,7 @@ class MegaDownloadHelper:
         if proxy:
             LOGGER.info(f"Using proxy for Mega download: {proxy}")
         
-        self.client = MegaNzClient(use_progress_bar=False)
+        self.client = MegaNzClient()
         self.client._progress_bar = CustomProgressBar(self)
         
         if proxy:
