@@ -39,7 +39,8 @@ cpu_no = cpu_count()
 threads = max(1, cpu_no // 2)
 cores = ",".join(str(i) for i in reversed(range(threads)))
 
-DOWNLOAD_DIR = "/app/downloads/"
+#DOWNLOAD_DIR = "/app/downloads/"
+DOWNLOAD_DIR = "downloads/"
 intervals = {"status": {}, "qb": "", "jd": "", "nzb": "", "stopAll": False}
 qb_torrents = {}
 jd_downloads = {}
