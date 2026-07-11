@@ -199,7 +199,7 @@ class MegaDownloadHelper:
                         all_uploaded_files = {}
                         total_corrupted = 0
                         
-                        resume_dir = "/app/mega_resume_state"
+                        resume_dir = "mega_resume_state"
                         os.makedirs(resume_dir, exist_ok=True)
                         state_file = os.path.join(resume_dir, f"{folder_id}.txt")
                         
