@@ -246,6 +246,7 @@ class MegaDownloadHelper:
                 
                 if is_folder:
                     folder_id, _ = self.client._parse_folder_url(url)
+                    public_folder_id = folder_id
                     nodes = await self.client.get_nodes_public_folder(url)
                     root_id = next(iter(nodes))
                     
@@ -324,7 +325,7 @@ class MegaDownloadHelper:
                                         "g": 1,
                                         "n": node["h"],
                                     },
-                                    {"n": folder_id},
+                                    {"n": public_folder_id},
                                 )
                                 file_url = file_data["g"]
                                 file_size = file_data["s"]
@@ -402,7 +403,7 @@ class MegaDownloadHelper:
                                         "g": 1,
                                         "n": file_node["h"],
                                     },
-                                    {"n": folder_id},
+                                    {"n": public_folder_id},
                                 )
                                 file_url = file_data["g"]
                                 file_size = file_data["s"]
