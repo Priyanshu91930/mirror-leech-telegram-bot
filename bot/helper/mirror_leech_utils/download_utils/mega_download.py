@@ -5,10 +5,13 @@ import aiohttp
 from time import time
 from pathlib import Path
 from secrets import token_urlsafe
+from functools import partial
 
 from mega.client import Mega
 from mega.errors import RequestError
 from natsort import natsorted
+from pyrogram.filters import regex, user
+from pyrogram.handlers import CallbackQueryHandler
 
 from .... import (
     LOGGER,
@@ -18,9 +21,73 @@ from .... import (
 )
 from ....core.config_manager import Config
 from ...ext_utils.task_manager import check_running_tasks, stop_duplicate_check
+from ...ext_utils.bot_utils import new_task
 from ...mirror_leech_utils.status_utils.mega_status import MegaStatus
 from ...mirror_leech_utils.status_utils.queue_status import QueueStatus
-from ...telegram_helper.message_utils import send_status_message
+from ...telegram_helper.button_build import ButtonMaker
+from ...telegram_helper.message_utils import (
+    send_status_message,
+    send_message,
+    delete_message,
+    edit_message,
+)
+
+@new_task
+async def selectMegaFolder(_, query, obj):
+    data = query.data.split()
+    message = query.message
+    await query.answer()
+    if data[1] == "all":
+        obj.selected_node_id = obj.root_id
+        obj.event.set()
+    elif data[1] == "cancel":
+        await edit_message(message, "Task has been cancelled.")
+        obj.listener.is_cancelled = True
+        obj.event.set()
+    else:
+        obj.selected_node_id = data[1]
+        obj.event.set()
+
+class MegaFolderHelper:
+    def __init__(self, listener, root_id, subfolders):
+        self.listener = listener
+        self.root_id = root_id
+        self.subfolders = subfolders
+        self.selected_node_id = None
+        self.event = asyncio.Event()
+        self._reply_to = None
+
+    async def _event_handler(self):
+        pfunc = partial(selectMegaFolder, obj=self)
+        handler = self.listener.client.add_handler(
+            CallbackQueryHandler(
+                pfunc, filters=regex("^megasel") & user(self.listener.user_id)
+            ),
+            group=-1,
+        )
+        try:
+            await asyncio.wait_for(self.event.wait(), timeout=180)
+        except asyncio.TimeoutError:
+            await edit_message(self._reply_to, "Timed Out. Task has been cancelled!")
+            self.listener.is_cancelled = True
+            self.event.set()
+        finally:
+            self.listener.client.remove_handler(*handler)
+
+    async def wait_for_selection(self):
+        buttons = ButtonMaker()
+        for node_id, name in self.subfolders[:20]:
+            buttons.data_button(name[:30], f"megasel {node_id}")
+        buttons.data_button("Download All", "megasel all", position="footer")
+        buttons.data_button("Cancel", "megasel cancel", position="footer")
+        button = buttons.build_menu(2)
+        folder_name = self.listener.name or "MegaFolder"
+        msg = f"Mega folder <b>{folder_name}</b> has multiple subfolders. Select which folder to download:\nTimeout: 3 min"
+        self._reply_to = await send_message(self.listener.message, msg, button)
+        await self._event_handler()
+        if not self.listener.is_cancelled:
+            await delete_message(self._reply_to)
+        return not self.listener.is_cancelled
 
 class ProxyClientSession(aiohttp.ClientSession):
     def __init__(self, proxy=None, *args, **kwargs):
@@ -181,12 +248,29 @@ class MegaDownloadHelper:
                     folder_id, _ = self.client._parse_folder_url(url)
                     nodes = await self.client.get_nodes_public_folder(url)
                     root_id = next(iter(nodes))
-                    fs = await self.client._build_file_system(nodes, [root_id])
-                    fs = dict(natsorted(fs.items(), key=lambda x: x[0]))
-                    self.listener.size = sum(node.get("s", 0) for node in fs.values() if node.get("t") == 0)
                     
                     if not self.listener.name:
                         self.listener.name = nodes[root_id].get("attributes", {}).get("n", "MegaFolder")
+                    
+                    subfolders = []
+                    for node_id, node in nodes.items():
+                        if node.get("p") == root_id and node.get("t") == 1:
+                            subfolders.append((node_id, node.get("attributes", {}).get("n", "Unknown Folder")))
+                    
+                    selected_node_id = root_id
+                    if subfolders:
+                        helper = MegaFolderHelper(self.listener, root_id, subfolders)
+                        if not await helper.wait_for_selection():
+                            return
+                        selected_node_id = helper.selected_node_id
+                    
+                    if selected_node_id != root_id:
+                        self.listener.name = nodes[selected_node_id].get("attributes", {}).get("n", "SubFolder")
+                        folder_id = selected_node_id
+                    
+                    fs = await self.client._build_file_system(nodes, [selected_node_id])
+                    fs = dict(natsorted(fs.items(), key=lambda x: x[0]))
+                    self.listener.size = sum(node.get("s", 0) for node in fs.values() if node.get("t") == 0)
                     
                     LOGGER.info(f"Downloading Mega Folder: {self.listener.name} ({self.listener.size} bytes)")
                     
