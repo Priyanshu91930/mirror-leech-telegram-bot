@@ -35,29 +35,47 @@ from ...telegram_helper.message_utils import (
 @new_task
 async def selectMegaFolder(_, query, obj):
     data = query.data.split()
-    message = query.message
     await query.answer()
-    if data[1] == "all":
-        obj.selected_node_id = obj.root_id
+    action = data[1]
+
+    if action == "select":
+        obj.folder_path.append(obj.current_folder_id)
+        obj.current_folder_id = data[2]
         obj.event.set()
-    elif data[1] == "cancel":
-        await edit_message(message, "Task has been cancelled.")
+    elif action == "download":
+        obj.action = "download"
+        obj.event.set()
+    elif action == "download_all":
+        obj.action = "download_all"
+        obj.event.set()
+    elif action == "back":
+        if obj.folder_path:
+            obj.current_folder_id = obj.folder_path.pop()
+        obj.event.set()
+    elif action == "cancel":
         obj.listener.is_cancelled = True
-        obj.event.set()
-    else:
-        obj.selected_node_id = data[1]
         obj.event.set()
 
 class MegaFolderHelper:
-    def __init__(self, listener, root_id, subfolders):
+    def __init__(self, listener, nodes, root_id):
         self.listener = listener
+        self.nodes = nodes
         self.root_id = root_id
-        self.subfolders = subfolders
+        self.current_folder_id = root_id
+        self.folder_path = []
         self.selected_node_id = None
+        self.action = None
         self.event = asyncio.Event()
         self._reply_to = None
 
-    async def _event_handler(self):
+    def _get_subfolders(self, parent_id):
+        subfolders = []
+        for node_id, node in self.nodes.items():
+            if node.get("p") == parent_id and node.get("t") == 1:
+                subfolders.append((node_id, node.get("attributes", {}).get("n", "Unknown Folder")))
+        return subfolders
+
+    async def _render_and_wait(self):
         pfunc = partial(selectMegaFolder, obj=self)
         handler = self.listener.client.add_handler(
             CallbackQueryHandler(
@@ -66,28 +84,63 @@ class MegaFolderHelper:
             group=-1,
         )
         try:
-            await asyncio.wait_for(self.event.wait(), timeout=180)
+            while True:
+                subfolders = self._get_subfolders(self.current_folder_id)
+
+                buttons = ButtonMaker()
+                for node_id, name in subfolders[:20]:
+                    buttons.data_button(name[:30], f"megasel select {node_id}")
+
+                buttons.data_button("Download This Folder", "megasel download", position="footer")
+
+                if self.current_folder_id == self.root_id:
+                    buttons.data_button("Download All", "megasel download_all", position="footer")
+
+                if self.folder_path:
+                    buttons.data_button("Back", "megasel back", position="footer")
+
+                buttons.data_button("Cancel", "megasel cancel", position="footer")
+                button = buttons.build_menu(2)
+
+                current_name = self.nodes.get(self.current_folder_id, {}).get("attributes", {}).get("n", "MegaFolder")
+                msg = f"<b>{current_name}</b>"
+                if subfolders:
+                    msg += f"\n{len(subfolders)} subfolder(s). Select to navigate:"
+                else:
+                    msg += "\nNo subfolders. Download this folder?"
+                msg += "\nTimeout: 3 min"
+
+                if self._reply_to:
+                    await edit_message(self._reply_to, msg, button)
+                else:
+                    self._reply_to = await send_message(self.listener.message, msg, button)
+
+                self.event.clear()
+                self.action = None
+                await asyncio.wait_for(self.event.wait(), timeout=180)
+
+                if self.listener.is_cancelled:
+                    return False
+
+                if self.action == "download":
+                    self.selected_node_id = self.current_folder_id
+                    return True
+                if self.action == "download_all":
+                    self.selected_node_id = self.root_id
+                    return True
+
         except asyncio.TimeoutError:
             await edit_message(self._reply_to, "Timed Out. Task has been cancelled!")
             self.listener.is_cancelled = True
-            self.event.set()
+            return False
         finally:
             self.listener.client.remove_handler(*handler)
 
     async def wait_for_selection(self):
-        buttons = ButtonMaker()
-        for node_id, name in self.subfolders[:20]:
-            buttons.data_button(name[:30], f"megasel {node_id}")
-        buttons.data_button("Download All", "megasel all", position="footer")
-        buttons.data_button("Cancel", "megasel cancel", position="footer")
-        button = buttons.build_menu(2)
-        folder_name = self.listener.name or "MegaFolder"
-        msg = f"Mega folder <b>{folder_name}</b> has multiple subfolders. Select which folder to download:\nTimeout: 3 min"
-        self._reply_to = await send_message(self.listener.message, msg, button)
-        await self._event_handler()
+        result = await self._render_and_wait()
         if not self.listener.is_cancelled:
             await delete_message(self._reply_to)
-        return not self.listener.is_cancelled
+        return result
 
 class ProxyClientSession(aiohttp.ClientSession):
     def __init__(self, proxy=None, *args, **kwargs):
@@ -253,14 +306,13 @@ class MegaDownloadHelper:
                     if not self.listener.name:
                         self.listener.name = nodes[root_id].get("attributes", {}).get("n", "MegaFolder")
                     
-                    subfolders = []
-                    for node_id, node in nodes.items():
-                        if node.get("p") == root_id and node.get("t") == 1:
-                            subfolders.append((node_id, node.get("attributes", {}).get("n", "Unknown Folder")))
-                    
                     selected_node_id = root_id
-                    if subfolders:
-                        helper = MegaFolderHelper(self.listener, root_id, subfolders)
+                    root_subfolders = [
+                        n for n in nodes.values()
+                        if n.get("p") == root_id and n.get("t") == 1
+                    ]
+                    if root_subfolders:
+                        helper = MegaFolderHelper(self.listener, nodes, root_id)
                         if not await helper.wait_for_selection():
                             return
                         selected_node_id = helper.selected_node_id
