@@ -349,6 +349,10 @@ class TaskConfig:
                 self.hybrid_leech = False
             if self.user_trans:
                 self.user_transmission = TgClient.IS_PREMIUM_USER
+            if self.is_leech:
+                self.up_dest = self.user_id
+                self.user_transmission = False
+                self.hybrid_leech = False
             if self.up_dest:
                 if not isinstance(self.up_dest, int):
                     if self.up_dest.startswith("b:"):

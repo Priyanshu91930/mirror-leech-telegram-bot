@@ -30,6 +30,7 @@ from ..helper.mirror_leech_utils.download_utils.direct_link_generator import (
 )
 from ..helper.mirror_leech_utils.download_utils.gd_download import add_gd_download
 from ..helper.mirror_leech_utils.download_utils.jd_download import add_jd_download
+from ..helper.mirror_leech_utils.download_utils.mega_download import add_mega_download
 from ..helper.mirror_leech_utils.download_utils.qbit_download import add_qb_torrent
 from ..helper.mirror_leech_utils.download_utils.nzb_downloader import add_nzb
 from ..helper.mirror_leech_utils.download_utils.rclone_download import (
@@ -135,7 +136,7 @@ class Mirror(TaskListener):
         self.thumbnail_layout = args["-tl"]
         self.as_doc = args["-doc"]
         self.as_med = args["-med"]
-        self.folder_name = f"/{args["-m"]}".rstrip("/") if len(args["-m"]) > 0 else ""
+        self.folder_name = f"/{args['-m']}".rstrip("/") if len(args["-m"]) > 0 else ""
         self.bot_trans = args["-bt"]
         self.user_trans = args["-ut"]
         self.ffmpeg_cmds = args["-ff"]
@@ -353,6 +354,8 @@ class Mirror(TaskListener):
             await add_rclone_download(self, f"{path}/")
         elif is_gdrive_link(self.link) or is_gdrive_id(self.link):
             await add_gd_download(self, path)
+        elif isinstance(self.link, str) and ("mega.nz" in self.link or "mega.co.nz" in self.link):
+            await add_mega_download(self, path)
         else:
             ussr = args["-au"]
             pssw = args["-ap"]

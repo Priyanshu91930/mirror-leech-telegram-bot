@@ -1,6 +1,6 @@
 # REQUIRED CONFIG
-BOT_TOKEN = "8543112996:AAEwAxq0F3Al9Kq4VCHHdzkcWzluSMok_4A"
-OWNER_ID = 1246987713
+BOT_TOKEN = "8636917355:AAEQIwEbEjadmS27Sc_1YIVFOor_42joZQ8"
+OWNER_ID = 8494193109
 TELEGRAM_API = 27686895
 TELEGRAM_HASH = "0e996bd3891969ec5dfebf8bb3e39e94"
 # OPTIONAL CONFIG
@@ -9,7 +9,7 @@ USER_SESSION_STRING = ""
 CMD_SUFFIX = ""
 AUTHORIZED_CHATS = ""
 SUDO_USERS = ""
-DATABASE_URL = ""
+DATABASE_URL = "mongodb+srv://anihubyt:Zxcvbnmm9193@cluster0.qv5tu12.mongodb.net/?appName=Cluster0"
 STATUS_LIMIT = 4
 DEFAULT_UPLOAD = "rc"
 STATUS_UPDATE_INTERVAL = 15
@@ -38,6 +38,17 @@ RCLONE_SERVE_PASS = ""
 # JDownloader
 JD_EMAIL = ""
 JD_PASS = ""
+# Mega
+MEGA_EMAIL = "priyanshusolanki62@gmail.com"
+MEGA_PASSWORD = "zxcvbnmm9193"
+MEGA_PROXIES = []
+MEGA_ACCOUNTS = [
+    ("priyanshusolanki62@gmail.com", "zxcvbnmm9193"),
+    ("newmsks94@gmail.com", "Zxcvbnmm9193"),
+    ("hindrani997@gmail.com", "Zxcvbnmm9193"),
+    ("ashusolanki9193@gmail.com", "Zxcvbnmm9193"),
+    ("solankipriyanshu94@gmail.com", "zxcvbnmm9193"),
+]
 # Sabnzbd
 USENET_SERVERS = [
     {

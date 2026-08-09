@@ -42,7 +42,8 @@ LOGGER = getLogger(__name__)
 
 
 class TelegramUploader:
-    def __init__(self, listener, path):
+    def __init__(self, listener, path, is_sub_upload=False):
+        self.is_sub_upload = is_sub_upload
         self._last_uploaded = 0
         self._processed_bytes = 0
         self._listener = listener
@@ -312,6 +313,8 @@ class TelegramUploader:
             )
             return
         LOGGER.info(f"Leech Completed: {self._listener.name}")
+        if self.is_sub_upload:
+            return self._msgs_dict
         await self._listener.on_upload_complete(
             None, self._msgs_dict, self._total_files, self._corrupted
         )
