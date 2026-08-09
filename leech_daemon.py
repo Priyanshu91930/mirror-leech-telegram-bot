@@ -188,7 +188,7 @@ async def download_file(url, local_path, progress_tracker=None):
 
 async def process_task(task):
     task_id = task['_id']
-    chat_id = task['chatId']
+    chat_id = int(task['chatId'])
     message_id = task.get('messageId')
     dlink = task['dlink']
     filename = task['filename']
