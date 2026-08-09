@@ -123,6 +123,7 @@ class TaskProgress:
         self.start_time = time.time()
         self.last_update_time = 0
         self.running = True
+        self.loop = asyncio.get_event_loop()
 
     def update(self, current, total):
         self.current = current
@@ -131,7 +132,7 @@ class TaskProgress:
         # Throttled at 5 seconds interval to avoid Telegram Flood limits
         if now - self.last_update_time > 5 and self.running:
             self.last_update_time = now
-            asyncio.run_coroutine_threadsafe(self.send_update(), asyncio.get_event_loop())
+            asyncio.run_coroutine_threadsafe(self.send_update(), self.loop)
 
     async def send_update(self):
         if not self.running:
@@ -192,6 +193,10 @@ async def process_task(task):
     message_id = task.get('messageId')
     dlink = task['dlink']
     filename = task['filename']
+
+    # Initialize trackers
+    download_tracker = None
+    upload_tracker = None
 
     logger.info(f"Processing task {task_id} for chat {chat_id} - file: {filename}")
     
