@@ -12,11 +12,18 @@ from bson.objectid import ObjectId
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("LeechDaemon")
 
+# Try importing dotenv to load local env files
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # Add current directory to path to import config
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     import config
-    BOT_TOKEN = getattr(config, 'BOT_TOKEN', '')
+    BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or getattr(config, 'BOT_TOKEN', '')
     API_ID = getattr(config, 'TELEGRAM_API', 0)
     API_HASH = getattr(config, 'TELEGRAM_HASH', '')
 except ImportError:
