@@ -43,6 +43,13 @@ try:
         db = client['terabox_downloader']
     tasks_collection = db['leechtasks']
     logger.info("Connected to MongoDB successfully.")
+    
+    # Auto-healing: Reset any stuck 'processing' tasks to 'pending' on startup
+    reset_res = tasks_collection.update_many(
+        {'status': 'processing'},
+        {'$set': {'status': 'pending'}}
+    )
+    logger.info(f"Reset {reset_res.modified_count} stuck 'processing' tasks to 'pending' on startup.")
 except Exception as e:
     logger.error(f"MongoDB connection failed: {e}")
     sys.exit(1)
